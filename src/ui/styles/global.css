@@ -369,6 +369,9 @@ body {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+    /* Keep native scroll anchoring on, so the browser compensates the scroll
+       position when the virtualizer resizes content above the viewport. */
+    overflow-anchor: auto;
 }
 
 .main-content {

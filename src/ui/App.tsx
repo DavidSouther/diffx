@@ -225,7 +225,11 @@ export function App() {
           </Resizable>
         )}
         <main className="main">
-          <Virtualizer className="main-scroll" contentClassName="main-content">
+          <Virtualizer
+            className="main-scroll"
+            contentClassName="main-content"
+            config={{ overscrollSize: 2000 }}
+          >
             <DiffViewer
               files={displayFiles}
               diffStyle={settings.diffStyle}
