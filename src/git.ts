@@ -3,6 +3,7 @@ import { basename, join, resolve } from 'node:path'
 import { readFileSync, lstatSync, readlinkSync } from 'node:fs'
 import { isSafePath } from './path.js'
 import { parseSync as parseEditorConfig, type ProcessedFileConfig } from 'editorconfig'
+import type { ReviewIdentity } from './types.js'
 
 const IMAGE_EXTENSIONS = new Set([
   '.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg', '.ico', '.avif',
@@ -211,4 +212,66 @@ function getUntrackedFilesDiff(): string {
   }
 
   return patches.length > 0 ? '\n' + patches.join('\n') : ''
+}
+
+function tryRevParse(rev: string): string | null {
+  try {
+    return execFileSync('git', ['rev-parse', rev], { encoding: 'utf-8', stdio: 'pipe' }).trim()
+  } catch {
+    return null
+  }
+}
+
+// A range token like `A..B` or `A...B` names two revisions; anything else
+// that isn't a flag (`--staged`) names one.
+const REVISION_RANGE_REGEX = /^(.+?)(\.\.\.|\.\.)(.+)$/
+
+function revisionTokensIn(args: string[]): string[] {
+  const tokens: string[] = []
+  for (const arg of args) {
+    if (arg.startsWith('-')) continue
+    const rangeMatch = arg.match(REVISION_RANGE_REGEX)
+    if (rangeMatch) {
+      tokens.push(rangeMatch[1], rangeMatch[3])
+    } else {
+      tokens.push(arg)
+    }
+  }
+  return tokens
+}
+
+// Resolves the review identity for the given custom diff args
+// (or the default working-tree mode when undefined). Runs `git rev-parse` for
+// each named revision; falls back to the verbatim args plus HEAD when a
+// revision cannot be resolved.
+export function resolveReviewIdentity(customDiffArgs?: string[]): ReviewIdentity {
+  const repoRoot = getRepoRoot()
+
+  if (customDiffArgs === undefined) {
+    return { repoRoot, args: [], revisions: [], head: tryRevParse('HEAD') ?? undefined }
+  }
+
+  const revisionTokens = revisionTokensIn(customDiffArgs)
+  const revisions: string[] = []
+  let resolvedAll = revisionTokens.length > 0
+  for (const token of revisionTokens) {
+    const sha = tryRevParse(token)
+    if (sha === null) {
+      resolvedAll = false
+      break
+    }
+    revisions.push(sha)
+  }
+
+  if (!resolvedAll) {
+    // Nothing revision-shaped in args (e.g. only flags), or a named
+    // revision doesn't exist: fall back to the verbatim args plus HEAD.
+    return { repoRoot, args: customDiffArgs, revisions: [], head: tryRevParse('HEAD') ?? undefined }
+  }
+
+  // A range (two or more named revisions) already pins both endpoints, so it
+  // needs no HEAD. A single revision diffs against the working tree/index,
+  // so HEAD is part of the identity.
+  const head = revisions.length <= 1 ? tryRevParse('HEAD') ?? undefined : undefined
+  return { repoRoot, args: customDiffArgs, revisions, head }
 }

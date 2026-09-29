@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { DiffLineAnnotation } from '@pierre/diffs'
 import type { ReviewComment } from '../../types'
 
-const COMMENTS_KEY = ['comments']
+export const COMMENTS_KEY = ['comments']
 
 async function fetchComments(): Promise<ReviewComment[]> {
   const res = await fetch('/api/comments')
@@ -114,7 +114,8 @@ export function useComments() {
           comment.startLineNumber != null && comment.startLineNumber !== comment.lineNumber
             ? `${comment.startLineNumber}-${comment.lineNumber}`
             : `${comment.lineNumber}`
-        lines.push(`<comment line="${lineLabel}">`)
+        const statusAttr = comment.status === 'resolved' ? ' status="resolved"' : ''
+        lines.push(`<comment line="${lineLabel}"${statusAttr}>`)
         const prefix = comment.side === 'additions' ? '+' : '-'
         const code = comment.lineContent
           .split('\n')

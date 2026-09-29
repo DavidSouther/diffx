@@ -2,12 +2,14 @@ import { useState, useRef, useEffect } from 'react'
 
 interface CommentFormProps {
   lineRange?: [number, number]
+  initialBody?: string
+  submitLabel?: string
   onSubmit: (body: string) => void
   onCancel: () => void
 }
 
-export function CommentForm({ lineRange, onSubmit, onCancel }: CommentFormProps) {
-  const [body, setBody] = useState('')
+export function CommentForm({ lineRange, initialBody, submitLabel, onSubmit, onCancel }: CommentFormProps) {
+  const [body, setBody] = useState(initialBody ?? '')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -51,7 +53,7 @@ export function CommentForm({ lineRange, onSubmit, onCancel }: CommentFormProps)
           Cancel
         </button>
         <button className="btn btn-primary" onClick={handleSubmit} disabled={!body.trim()}>
-          Comment
+          {submitLabel ?? 'Comment'}
         </button>
       </div>
     </div>

@@ -3,16 +3,22 @@ import { parseArgs } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import getPort from 'get-port'
-import { isGitRepo } from './git.js'
+import { isGitRepo, resolveReviewIdentity } from './git.js'
 import { startServer } from './server.js'
 import { loadSettings } from './settings.js'
+import { openReviewStore } from './reviewStore.js'
+import type { CommentStore } from './comments.js'
+import type { ReviewMeta } from './types.js'
 
 const { values, positionals } = parseArgs({
   options: {
     port: { type: 'string', short: 'p' },
     host: { type: 'string' },
     'no-open': { type: 'boolean', default: false },
+    persist: { type: 'boolean', default: false },
     help: { type: 'boolean' },
     version: { type: 'boolean', short: 'v' },
   },
@@ -29,6 +35,8 @@ Options:
   --host <host>      Host address to bind to (default: 127.0.0.1). Pass
                      0.0.0.0 to expose the server to the local network.
   --no-open          Don't open the browser automatically
+  --persist          Save review comments to disk and restore them on the
+                     next run against the same diff
   -v, --version      Show version number
   -h, --help         Show this help message
 
@@ -66,11 +74,32 @@ const resolvedClientDir = existsSync(clientDir)
   ? clientDir
   : resolve(process.cwd(), 'dist/client')
 
-const { port: actualPort } = await startServer({ port, host, clientDir: resolvedClientDir, customDiffArgs })
+let commentStore: CommentStore | undefined
+let reviewMeta: ReviewMeta | undefined
+if (values.persist) {
+  const identity = resolveReviewIdentity(customDiffArgs)
+  const reviewsDir = join(homedir(), '.config', 'diffx', 'reviews')
+  const { store, restoredCount, file } = openReviewStore(reviewsDir, identity)
+  commentStore = store
+  reviewMeta = { persisted: true, file, identity, restoredCount }
+}
+
+const { port: actualPort } = await startServer({
+  port,
+  host,
+  clientDir: resolvedClientDir,
+  customDiffArgs,
+  commentStore,
+  reviewMeta,
+})
 
 const localUrl = `http://${host}:${actualPort}`
 
 console.log(`diffx server running at ${localUrl}`)
+
+if (reviewMeta) {
+  console.log(`Comments are saved to ${reviewMeta.file} (${reviewMeta.restoredCount} restored)`)
+}
 
 if (!values['no-open']) {
   const settings = loadSettings()

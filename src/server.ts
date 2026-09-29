@@ -6,7 +6,11 @@ import { getGitDiff, getCustomGitDiff, getRepoName, getBranchName, getFileConten
 import { loadSettings, saveSettings } from './settings.js'
 import { InMemoryCommentStore } from './comments.js'
 import type { CommentStore } from './comments.js'
+import { importComments } from './commentImport.js'
 import { isSafePath } from './path.js'
+import type { ReviewComment, ReviewMeta } from './types.js'
+
+const MAX_IMPORT_BYTES = 1_000_000
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
@@ -90,10 +94,19 @@ function diffContainsFileVersion(patch: string, path: string, oldOid: string, ne
   return false
 }
 
-export function createApp(clientDir: string, customDiffArgs?: string[], commentStore?: CommentStore) {
+export interface CreateAppOptions {
+  clientDir: string
+  customDiffArgs?: string[]
+  commentStore?: CommentStore
+  reviewMeta?: ReviewMeta
+}
+
+export function createApp(options: CreateAppOptions) {
+  const { clientDir, customDiffArgs, commentStore, reviewMeta } = options
   const app = new Hono()
   const isCustomMode = !!customDiffArgs
   const store = commentStore ?? new InMemoryCommentStore()
+  const meta: ReviewMeta = reviewMeta ?? { persisted: false, restoredCount: 0 }
   const viewedFiles = new Map<string, string>()
 
   app.get('/api/diff', (c) => {
@@ -191,6 +204,10 @@ export function createApp(clientDir: string, customDiffArgs?: string[], commentS
     return c.json({ ok: true })
   })
 
+  app.get('/api/review', (c) => {
+    return c.json(meta)
+  })
+
   app.get('/api/comments', async (c) => {
     const comments = await store.getAll()
     return c.json(comments)
@@ -217,9 +234,32 @@ export function createApp(clientDir: string, customDiffArgs?: string[], commentS
   app.put('/api/comments/:id', async (c) => {
     const id = c.req.param('id')
     const { body, status } = await c.req.json()
-    const updated = await store.update(id, { body, status })
+    if (body !== undefined && (typeof body !== 'string' || body.trim() === '')) {
+      return c.json({ error: 'Comment body must be a non-empty string' }, 400)
+    }
+    const existing = (await store.getAll()).find((comment) => comment.id === id)
+    if (!existing) return c.json({ error: 'Comment not found' }, 404)
+    const fields: { body?: string; status?: ReviewComment['status']; editedAt?: number } = { status }
+    if (body !== undefined && body !== existing.body) {
+      fields.body = body
+      fields.editedAt = Date.now()
+    }
+    const updated = await store.update(id, fields)
     if (!updated) return c.json({ error: 'Comment not found' }, 404)
     return c.json(updated)
+  })
+
+  app.post('/api/comments/import', async (c) => {
+    const contentLength = Number(c.req.header('content-length') ?? 0)
+    if (contentLength > MAX_IMPORT_BYTES) {
+      return c.json({ error: 'Import text is too large' }, 413)
+    }
+    const { text } = await c.req.json<{ text: string }>()
+    if (typeof text !== 'string' || Buffer.byteLength(text, 'utf-8') > MAX_IMPORT_BYTES) {
+      return c.json({ error: 'Import text is too large' }, 413)
+    }
+    const result = await importComments(store, text)
+    return c.json(result)
   })
 
   app.post('/api/comments/:id/replies', async (c) => {
@@ -274,8 +314,10 @@ export function startServer(options: {
   host: string
   clientDir: string
   customDiffArgs?: string[]
+  commentStore?: CommentStore
+  reviewMeta?: ReviewMeta
 }): Promise<{ port: number }> {
-  const app = createApp(options.clientDir, options.customDiffArgs)
+  const app = createApp(options)
 
   return new Promise((resolve) => {
     const server = serve({

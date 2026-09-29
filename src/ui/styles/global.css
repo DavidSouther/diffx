@@ -208,6 +208,86 @@ body {
     cursor: pointer;
 }
 
+/* Review status dialog */
+.review-status-wrapper {
+    position: relative;
+}
+
+.review-status-dialog {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    width: 320px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 200;
+    padding: 12px 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .review-status-dialog {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+}
+
+.review-status-dialog-title {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.review-status-dialog-body {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.review-status-dialog-body p {
+    margin: 4px 0;
+}
+
+.review-status-dialog-body code {
+    font-size: 11px;
+}
+
+.review-status-import {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+}
+
+.review-status-import-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 6px;
+}
+
+.review-status-import-textarea {
+    display: block;
+    width: 100%;
+    min-height: 70px;
+    margin-top: 4px;
+    padding: 6px 8px;
+    font-family: inherit;
+    font-size: 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    resize: vertical;
+}
+
+.review-status-import-message {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
 .settings-select,
 .settings-input {
     padding: 2px 4px;
@@ -525,6 +605,42 @@ body {
     line-height: 1.5;
     white-space: pre-wrap;
     word-break: break-word;
+    color: var(--text);
+}
+
+.comment-bubble-edited {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-style: italic;
+    color: var(--text-secondary);
+}
+
+.comment-bubble-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.comment-bubble-edit {
+    flex-shrink: 0;
+    padding: 2px 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.1s;
+}
+
+.comment-bubble:hover .comment-bubble-edit {
+    opacity: 1;
+}
+
+.comment-bubble-edit:hover {
+    background: var(--border);
     color: var(--text);
 }
 

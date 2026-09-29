@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { GitBranch, Settings } from 'lucide-react'
 import type { DiffOptions } from '../hooks/useDiff'
+import type { ReviewMeta } from '../../types'
+import { ReviewStatusControl } from './ReviewStatusControl'
 
 interface ToolbarProps {
   repoName: string
@@ -15,6 +17,7 @@ interface ToolbarProps {
   softWrap: boolean
   browser?: string
   customMode: boolean
+  reviewMeta: ReviewMeta | null
   onDiffStyleChange: (style: 'split' | 'unified') => void
   onDiffOptionsChange: (options: DiffOptions) => void
   onDefaultTabSizeChange: (size: number) => void
@@ -36,6 +39,7 @@ export function Toolbar({
   softWrap,
   browser,
   customMode,
+  reviewMeta,
   onDiffStyleChange,
   onDiffOptionsChange,
   onDefaultTabSizeChange,
@@ -170,6 +174,7 @@ export function Toolbar({
             </div>
           )}
         </div>
+        <ReviewStatusControl meta={reviewMeta} />
         <button
           className="btn btn-primary btn-sm"
           onClick={handleCopy}

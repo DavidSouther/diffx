@@ -3,7 +3,10 @@ import type { ReviewComment, CommentReply } from './types.js'
 export interface CommentStore {
   getAll(): Promise<ReviewComment[]>
   add(comment: ReviewComment): Promise<ReviewComment>
-  update(id: string, fields: { body?: string; status?: ReviewComment['status'] }): Promise<ReviewComment | null>
+  update(
+    id: string,
+    fields: { body?: string; status?: ReviewComment['status']; editedAt?: number },
+  ): Promise<ReviewComment | null>
   remove(id: string): Promise<boolean>
   addReply(commentId: string, reply: CommentReply): Promise<ReviewComment | null>
 }
@@ -20,11 +23,15 @@ export class InMemoryCommentStore implements CommentStore {
     return comment
   }
 
-  async update(id: string, fields: { body?: string; status?: ReviewComment['status'] }): Promise<ReviewComment | null> {
+  async update(
+    id: string,
+    fields: { body?: string; status?: ReviewComment['status']; editedAt?: number },
+  ): Promise<ReviewComment | null> {
     const comment = this.comments.find((c) => c.id === id)
     if (!comment) return null
     if (fields.body !== undefined) comment.body = fields.body
     if (fields.status !== undefined) comment.status = fields.status
+    if (fields.editedAt !== undefined) comment.editedAt = fields.editedAt
     return comment
   }
 

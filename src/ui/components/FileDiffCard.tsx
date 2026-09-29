@@ -30,6 +30,7 @@ interface FileDiffCardProps {
     body: string,
   ) => void
   onDeleteComment: (id: string) => void
+  onEditComment: (id: string, body: string) => void
 }
 
 export const FileDiffCard = memo(function FileDiffCard({
@@ -44,8 +45,12 @@ export const FileDiffCard = memo(function FileDiffCard({
   onViewedChange,
   onAddComment,
   onDeleteComment,
+  onEditComment,
 }: FileDiffCardProps) {
   const [pending, setPending] = useState<PendingComment | null>(null)
+  // Controlled so it can be cleared when the composer closes: while the
+  // library holds a selection it pins the "+" to it and ignores hover.
+  const [selection, setSelection] = useState<SelectedLineRange | null>(null)
 
   const getLineContent = (side: AnnotationSide, lineNumber: number): string => {
     const lines = side === 'additions' ? fileDiff.additionLines : fileDiff.deletionLines
@@ -113,6 +118,9 @@ export const FileDiffCard = memo(function FileDiffCard({
               expansionLineCount: 20,
               enableGutterUtility: true,
               enableLineSelection: true,
+              onLineSelectionStart: setSelection,
+              onLineSelectionChange: setSelection,
+              onLineSelected: setSelection,
               onGutterUtilityClick: (range: SelectedLineRange) => {
                 const side = range.side ?? range.endSide ?? 'additions'
                 setPending({
@@ -127,6 +135,7 @@ export const FileDiffCard = memo(function FileDiffCard({
               unsafeCSS: `:host { --diffs-tab-size: ${tabSize}; }`,
             }}
             lineAnnotations={allAnnotations}
+            selectedLines={selection}
             renderHeaderMetadata={() => (
               <label className="viewed-label" onClick={(e) => e.stopPropagation()}>
                 <input
@@ -146,8 +155,12 @@ export const FileDiffCard = memo(function FileDiffCard({
                       const lineContent = getLineRangeContent(pending!.side, pending!.startLine, pending!.endLine)
                       onAddComment(filePath, pending!.side, pending!.startLine, pending!.endLine, lineContent, body)
                       setPending(null)
+                      setSelection(null)
                     }}
-                    onCancel={() => setPending(null)}
+                    onCancel={() => {
+                      setPending(null)
+                      setSelection(null)
+                    }}
                   />
                 )
               }
@@ -155,6 +168,7 @@ export const FileDiffCard = memo(function FileDiffCard({
                 <CommentBubble
                   comment={annotation.metadata as ReviewComment}
                   onDelete={onDeleteComment}
+                  onEdit={onEditComment}
                 />
               )
             }}

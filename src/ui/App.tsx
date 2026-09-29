@@ -6,6 +6,7 @@ import type { FileDiffMetadata } from '@pierre/diffs'
 import type { ReviewComment } from '../types'
 import { useDiff } from './hooks/useDiff'
 import { useComments } from './hooks/useComments'
+import { useReview } from './hooks/useReview'
 import { useSettings } from './hooks/useSettings'
 import { useViewed } from './hooks/useViewed'
 import { useFullDiffs, fileKey } from './hooks/useFullDiffs'
@@ -35,8 +36,9 @@ export function App() {
     staged: settings.staged,
     untracked: settings.untracked,
   })
-  const { comments, addComment, removeComment, copyAllComments } =
+  const { comments, addComment, removeComment, editComment, copyAllComments } =
     useComments()
+  const { meta: reviewMeta } = useReview()
   const [activeFile, setActiveFile] = useState<string | null>(null)
   const [sidebar, setSidebar] = useState(() => SidebarStorage.load())
   const maxSidebarWidth = Math.max(SidebarStorage.minSize, useWindowSize({ factor: 0.5 }))
@@ -195,6 +197,7 @@ export function App() {
         softWrap={settings.softWrap}
         browser={settings.browser}
         customMode={customMode}
+        reviewMeta={reviewMeta}
         onDiffStyleChange={(style) => updateSettings({ diffStyle: style })}
         onDiffOptionsChange={(options) => updateSettings(options)}
         onDefaultTabSizeChange={(size) => updateSettings({ defaultTabSize: size })}
@@ -242,6 +245,7 @@ export function App() {
               fileAnnotationsMap={fileAnnotationsMap}
               onAddComment={addComment}
               onDeleteComment={removeComment}
+              onEditComment={editComment}
             />
           </Virtualizer>
         </main>
