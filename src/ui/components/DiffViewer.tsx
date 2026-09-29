@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react'
+import { memo, useCallback, useMemo } from 'react'
 import type { FileDiffMetadata, DiffLineAnnotation, AnnotationSide } from '@pierre/diffs'
 import type { ReviewComment } from '../../types'
 import type { BinaryFileInfo } from '../hooks/useDiff'
@@ -25,6 +25,15 @@ interface DiffViewerProps {
   ) => void
   onDeleteComment: (id: string) => void
   onEditComment: (id: string, body: string) => void
+}
+
+export function nextUnviewedFile(
+  sortedNames: string[],
+  current: string,
+  viewedFiles: Set<string>,
+): string | undefined {
+  const index = sortedNames.indexOf(current)
+  return sortedNames.slice(index + 1).find((name) => !viewedFiles.has(name))
 }
 
 const emptyAnnotations: DiffLineAnnotation<ReviewComment>[] = []
@@ -59,6 +68,24 @@ export const DiffViewer = memo(function DiffViewer({
     })
   }, [files])
 
+  const handleViewedChange = useCallback(
+    (filePath: string, viewed: boolean) => {
+      onViewedChange(filePath, viewed)
+      if (!viewed) return
+      const next = nextUnviewedFile(
+        sortedFiles.map((f) => f.name),
+        filePath,
+        viewedFiles,
+      )
+      if (!next) return
+      // Wait for the viewed card to collapse before measuring the target's position.
+      requestAnimationFrame(() => {
+        document.getElementById(`file-${next}`)?.scrollIntoView({ block: 'start' })
+      })
+    },
+    [onViewedChange, sortedFiles, viewedFiles],
+  )
+
   if (sortedFiles.length === 0) {
     return (
       <div className="empty-state">
@@ -79,7 +106,7 @@ export const DiffViewer = memo(function DiffViewer({
               filePath={filePath}
               info={binaryInfo}
               viewed={viewedFiles.has(filePath)}
-              onViewedChange={onViewedChange}
+              onViewedChange={handleViewedChange}
             />
           )
         }
@@ -99,7 +126,7 @@ export const DiffViewer = memo(function DiffViewer({
             tabSize={tabSizeMap[filePath] ?? defaultTabSize}
             softWrap={softWrap}
             viewed={viewedFiles.has(filePath)}
-            onViewedChange={onViewedChange}
+            onViewedChange={handleViewedChange}
             onAddComment={onAddComment}
             onDeleteComment={onDeleteComment}
             onEditComment={onEditComment}
