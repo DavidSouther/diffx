@@ -1,13 +1,14 @@
 import { useState, memo } from 'react'
 import { FileDiff } from '@pierre/diffs/react'
-import type { DiffLineAnnotation, FileDiffMetadata, AnnotationSide } from '@pierre/diffs'
+import type { DiffLineAnnotation, FileDiffMetadata, AnnotationSide, SelectedLineRange } from '@pierre/diffs'
 import type { ReviewComment } from '../../types'
 import { CommentForm } from './CommentForm'
 import { CommentBubble } from './CommentBubble'
 
 interface PendingComment {
   side: AnnotationSide
-  lineNumber: number
+  startLine: number
+  endLine: number
 }
 
 interface FileDiffCardProps {
@@ -20,7 +21,14 @@ interface FileDiffCardProps {
   softWrap: boolean
   viewed: boolean
   onViewedChange: (filePath: string, viewed: boolean) => void
-  onAddComment: (filePath: string, side: AnnotationSide, lineNumber: number, lineContent: string, body: string) => void
+  onAddComment: (
+    filePath: string,
+    side: AnnotationSide,
+    startLine: number,
+    endLine: number,
+    lineContent: string,
+    body: string,
+  ) => void
   onDeleteComment: (id: string) => void
 }
 
@@ -60,13 +68,21 @@ export const FileDiffCard = memo(function FileDiffCard({
     return ''
   }
 
+  const getLineRangeContent = (side: AnnotationSide, startLine: number, endLine: number): string => {
+    const content: string[] = []
+    for (let lineNumber = startLine; lineNumber <= endLine; lineNumber++) {
+      content.push(getLineContent(side, lineNumber))
+    }
+    return content.join('\n')
+  }
+
   const allAnnotations: DiffLineAnnotation<ReviewComment | { _pending: true }>[] = [
     ...annotations,
     ...(pending
       ? [
           {
             side: pending.side,
-            lineNumber: pending.lineNumber,
+            lineNumber: pending.endLine,
             metadata: { _pending: true as const },
           },
         ]
@@ -96,6 +112,15 @@ export const FileDiffCard = memo(function FileDiffCard({
               stickyHeader: true,
               expansionLineCount: 20,
               enableGutterUtility: true,
+              enableLineSelection: true,
+              onGutterUtilityClick: (range: SelectedLineRange) => {
+                const side = range.side ?? range.endSide ?? 'additions'
+                setPending({
+                  side,
+                  startLine: Math.min(range.start, range.end),
+                  endLine: Math.max(range.start, range.end),
+                })
+              },
               theme: { dark: 'github-dark', light: 'github-light' },
               themeType: 'system',
               overflow: softWrap ? 'wrap' : 'scroll',
@@ -116,9 +141,10 @@ export const FileDiffCard = memo(function FileDiffCard({
               if ('_pending' in annotation.metadata) {
                 return (
                   <CommentForm
+                    lineRange={pending!.startLine === pending!.endLine ? undefined : [pending!.startLine, pending!.endLine]}
                     onSubmit={(body) => {
-                      const lineContent = getLineContent(pending!.side, pending!.lineNumber)
-                      onAddComment(filePath, pending!.side, pending!.lineNumber, lineContent, body)
+                      const lineContent = getLineRangeContent(pending!.side, pending!.startLine, pending!.endLine)
+                      onAddComment(filePath, pending!.side, pending!.startLine, pending!.endLine, lineContent, body)
                       setPending(null)
                     }}
                     onCancel={() => setPending(null)}
@@ -132,19 +158,6 @@ export const FileDiffCard = memo(function FileDiffCard({
                 />
               )
             }}
-            renderGutterUtility={(getHoveredLine) => (
-              <button
-                className="gutter-add-btn"
-                onClick={() => {
-                  const line = getHoveredLine()
-                  if (line) {
-                    setPending({ side: line.side, lineNumber: line.lineNumber })
-                  }
-                }}
-              >
-                +
-              </button>
-            )}
           />
         </>
       )}

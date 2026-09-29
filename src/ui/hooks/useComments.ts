@@ -15,7 +15,7 @@ export function useComments() {
   const { data: comments = [] } = useQuery({ queryKey: COMMENTS_KEY, queryFn: fetchComments, refetchInterval: 3000 })
 
   const addMutation = useMutation({
-    mutationFn: async (params: { filePath: string; side: 'deletions' | 'additions'; lineNumber: number; lineContent: string; body: string }) => {
+    mutationFn: async (params: { filePath: string; side: 'deletions' | 'additions'; lineNumber: number; startLineNumber?: number; lineContent: string; body: string }) => {
       const res = await fetch('/api/comments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -55,8 +55,22 @@ export function useComments() {
   })
 
   const addComment = useCallback(
-    (filePath: string, side: 'deletions' | 'additions', lineNumber: number, lineContent: string, body: string) => {
-      addMutation.mutate({ filePath, side, lineNumber, lineContent, body })
+    (
+      filePath: string,
+      side: 'deletions' | 'additions',
+      startLine: number,
+      endLine: number,
+      lineContent: string,
+      body: string,
+    ) => {
+      addMutation.mutate({
+        filePath,
+        side,
+        lineNumber: endLine,
+        startLineNumber: startLine === endLine ? undefined : startLine,
+        lineContent,
+        body,
+      })
     },
     [addMutation],
   )
@@ -96,9 +110,17 @@ export function useComments() {
     for (const [filePath, fileComments] of grouped) {
       lines.push(`<file path="${filePath}">`)
       for (const comment of fileComments) {
-        lines.push(`<comment line="${comment.lineNumber}">`)
+        const lineLabel =
+          comment.startLineNumber != null && comment.startLineNumber !== comment.lineNumber
+            ? `${comment.startLineNumber}-${comment.lineNumber}`
+            : `${comment.lineNumber}`
+        lines.push(`<comment line="${lineLabel}">`)
         const prefix = comment.side === 'additions' ? '+' : '-'
-        lines.push(`<code>${prefix} ${comment.lineContent}</code>`)
+        const code = comment.lineContent
+          .split('\n')
+          .map((line) => `${prefix} ${line}`)
+          .join('\n')
+        lines.push(`<code>${code}</code>`)
         lines.push(comment.body)
         lines.push('</comment>')
       }

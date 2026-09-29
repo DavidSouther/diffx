@@ -11,6 +11,7 @@ interface CommentBubbleProps {
 export function CommentBubble({ comment, onDelete }: CommentBubbleProps) {
   const [, setTick] = useState(0)
   const isResolved = comment.status === 'resolved'
+  const isMultiLine = comment.startLineNumber != null && comment.startLineNumber !== comment.lineNumber
 
   useEffect(() => {
     const timer = setInterval(() => setTick((t) => t + 1), 30000)
@@ -21,6 +22,11 @@ export function CommentBubble({ comment, onDelete }: CommentBubbleProps) {
     <div className={`comment-bubble ${isResolved ? 'comment-resolved' : ''}`} id={`comment-${comment.id}`}>
       <div className="comment-bubble-header">
         <UserCircle size={18} className="comment-bubble-avatar" />
+        {isMultiLine && (
+          <span className="comment-bubble-range">
+            Lines {comment.startLineNumber}-{comment.lineNumber}
+          </span>
+        )}
         <span className="comment-bubble-time">{timeAgo(comment.createdAt)}</span>
         {isResolved && (
           <span className="comment-bubble-resolved">
