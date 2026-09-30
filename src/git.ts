@@ -112,7 +112,7 @@ export function getBranchName(): string {
 
 // Force standard unified diff regardless of user's git config
 // (e.g. diff.external = difftastic, color.ui = always).
-const DIFF_FLAGS = ['--no-ext-diff', '--no-color'] as const
+const DIFF_FLAGS = ['--no-ext-diff', '--no-color', '--src-prefix=a/', '--dst-prefix=b/'] as const
 
 export function getCustomGitDiff(args: string[]): string {
   return execFileSync('git', ['diff', ...DIFF_FLAGS, ...args], { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
