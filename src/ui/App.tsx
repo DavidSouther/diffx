@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { Resizable } from 'react-resizable'
-import { parsePatchFiles } from '@pierre/diffs'
 import { Virtualizer } from '@pierre/diffs/react'
 import type { FileDiffMetadata } from '@pierre/diffs'
 import type { ReviewComment } from '../types'
@@ -10,9 +9,12 @@ import { commentScope } from '../commentFormat'
 import { useReview } from './hooks/useReview'
 import { useSettings } from './hooks/useSettings'
 import { useViewed } from './hooks/useViewed'
-import { useFullDiffs, fileKey } from './hooks/useFullDiffs'
+import { useFullDiffs } from './hooks/useFullDiffs'
+import { usePatchEntries, useParsedFiles } from './hooks/useParsedFiles'
+import { EMPTY_CHARACTER_COUNTS, entryStub } from './patchIndex'
 import { Toolbar } from './components/Toolbar'
 import { DiffViewer } from './components/DiffViewer'
+import type { FileStatus } from './components/HiddenFileDiff'
 import { FileTree } from './components/FileTree'
 import { CommentTracker } from './components/CommentTracker'
 import { SidebarStorage } from './sidebarStorage'
@@ -58,53 +60,9 @@ export function App() {
 
   const untrackedSet = useMemo(() => new Set(untrackedFiles), [untrackedFiles])
 
-  const files = useMemo(() => {
-    if (!patch) return []
-    try {
-      const parsed = parsePatchFiles(patch)
-      const parsedFiles = parsed.flatMap((p) => p.files)
-
-      const existingNames = new Set(parsedFiles.map((f) => f.name))
-      for (const bf of binaryFiles) {
-        if (!existingNames.has(bf.path)) {
-          const syntheticFile: FileDiffMetadata = {
-            name: bf.path,
-            type: bf.type === 'added' || bf.type === 'untracked' ? 'new' : bf.type === 'deleted' ? 'deleted' : 'change',
-            hunks: [],
-            splitLineCount: 0,
-            unifiedLineCount: 0,
-            isPartial: true,
-            deletionLines: [],
-            additionLines: [],
-          }
-          parsedFiles.push(syntheticFile)
-        }
-      }
-
-      return parsedFiles
-    } catch {
-      return []
-    }
-  }, [patch, binaryFiles])
-
-  const fullFiles = useFullDiffs(patch, files, { staged: settings.staged, untracked: settings.untracked })
-  const displayFiles = useMemo(() => {
-    if (fullFiles.size === 0) return files
-    return files.map((f) => fullFiles.get(fileKey(f)) ?? f)
-  }, [files, fullFiles])
-
-  const { viewedFiles, setViewed } = useViewed(files)
-
-  const diffStats = useMemo(() => {
-    if (!patch) return { additions: 0, deletions: 0 }
-    let additions = 0
-    let deletions = 0
-    for (const line of patch.split('\n')) {
-      if (line.startsWith('+') && !line.startsWith('+++')) additions++
-      else if (line.startsWith('-') && !line.startsWith('---')) deletions++
-    }
-    return { additions, deletions }
-  }, [patch])
+  const { entries, indexing } = usePatchEntries(patch)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set())
+  useEffect(() => setExpandedIds(new Set()), [entries])
 
   const binaryFileMap = useMemo(() => {
     const map = new Map<string, (typeof binaryFiles)[number]>()
@@ -113,6 +71,85 @@ export function App() {
     }
     return map
   }, [binaryFiles])
+
+  // Metadata-only stand-ins: cheap, available as soon as the background
+  // indexer finishes, and enough for the file tree and viewed tracking.
+  const files = useMemo(() => {
+    const stubs = entries.map(entryStub)
+    const existingNames = new Set(stubs.map((f) => f.name))
+    for (const bf of binaryFiles) {
+      if (!existingNames.has(bf.path)) {
+        stubs.push({
+          name: bf.path,
+          type: bf.type === 'added' || bf.type === 'untracked' ? 'new' : bf.type === 'deleted' ? 'deleted' : 'change',
+          hunks: [],
+          splitLineCount: 0,
+          unifiedLineCount: 0,
+          isPartial: true,
+          deletionLines: [],
+          additionLines: [],
+          ...EMPTY_CHARACTER_COUNTS,
+        })
+      }
+    }
+    return stubs
+  }, [entries, binaryFiles])
+
+  const { viewedFiles, setViewed } = useViewed(files)
+
+  // Only parse what will be shown: not hidden-by-default files (until the
+  // user expands them), not viewed (collapsed) files, not binary files.
+  const wantedIds = useMemo(() => {
+    const wanted = new Set<string>()
+    for (const e of entries) {
+      if (binaryFileMap.has(e.name) || viewedFiles.has(e.name)) continue
+      if (e.hidden && !expandedIds.has(e.id)) continue
+      wanted.add(e.id)
+    }
+    return wanted
+  }, [entries, binaryFileMap, viewedFiles, expandedIds])
+
+  const parsedFiles = useParsedFiles(entries, wantedIds)
+  const fullFiles = useFullDiffs(entries, parsedFiles, { staged: settings.staged, untracked: settings.untracked })
+
+  const displayFiles = useMemo(
+    () => files.map((stub, i) => {
+      const entry = entries[i]
+      return entry ? (fullFiles.get(entry.id) ?? parsedFiles.get(entry.id) ?? stub) : stub
+    }),
+    [files, entries, parsedFiles, fullFiles],
+  )
+
+  const fileStatus = useMemo(() => {
+    const map = new Map<string, FileStatus>()
+    for (const e of entries) {
+      if (binaryFileMap.has(e.name)) continue
+      if (e.hidden && !expandedIds.has(e.id)) {
+        map.set(e.name, { kind: 'hidden', reason: e.hidden, size: e.size, additions: e.additions, deletions: e.deletions })
+      } else if (!parsedFiles.has(e.id) && !viewedFiles.has(e.name)) {
+        map.set(e.name, { kind: 'pending' })
+      }
+    }
+    return map
+  }, [entries, binaryFileMap, expandedIds, parsedFiles, viewedFiles])
+
+  const handleExpandFile = useCallback(
+    (filePath: string) => {
+      const ids = entries.filter((e) => e.name === filePath).map((e) => e.id)
+      setExpandedIds((prev) => new Set([...prev, ...ids]))
+    },
+    [entries],
+  )
+
+  const diffStats = useMemo(() => {
+    let additions = 0
+    let deletions = 0
+    for (const e of entries) {
+      additions += e.additions
+      deletions += e.deletions
+    }
+    return { additions, deletions }
+  }, [entries])
 
   const commentCounts = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -179,7 +216,7 @@ export function App() {
     </div>
   )
 
-  if (!loaded || loading) {
+  if (!loaded || loading || indexing) {
     return (
       <div className="loading">
         <p>Loading diff...</p>
@@ -254,6 +291,8 @@ export function App() {
               softWrap={settings.softWrap}
               viewedFiles={viewedFiles}
               binaryFiles={binaryFileMap}
+              fileStatus={fileStatus}
+              onExpandFile={handleExpandFile}
               onViewedChange={handleViewedChange}
               fileAnnotationsMap={fileAnnotationsMap}
               fileCommentsMap={fileCommentsMap}

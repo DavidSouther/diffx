@@ -7,6 +7,7 @@ export default defineConfig({
   define: {
     'process.env.NODE_ENV': JSON.stringify('production'),
   },
+  worker: { format: 'es' },
   build: {
     outDir: 'dist/client',
     emptyOutDir: true,

@@ -4,6 +4,8 @@ import type { ReviewComment } from '../../types'
 import type { BinaryFileInfo } from '../hooks/useDiff'
 import { FileDiffCard } from './FileDiffCard'
 import { BinaryFileDiff } from './BinaryFileDiff'
+import { HiddenFileDiff } from './HiddenFileDiff'
+import type { FileStatus } from './HiddenFileDiff'
 import { CommentBubble } from './CommentBubble'
 import { CommentForm } from './CommentForm'
 
@@ -15,6 +17,8 @@ interface DiffViewerProps {
   softWrap: boolean
   viewedFiles: Set<string>
   binaryFiles: Map<string, BinaryFileInfo>
+  fileStatus: Map<string, FileStatus>
+  onExpandFile: (filePath: string) => void
   onViewedChange: (filePath: string, viewed: boolean) => void
   fileAnnotationsMap: Map<string, DiffLineAnnotation<ReviewComment>[]>
   fileCommentsMap: Map<string, ReviewComment[]>
@@ -52,6 +56,8 @@ export const DiffViewer = memo(function DiffViewer({
   softWrap,
   viewedFiles,
   binaryFiles,
+  fileStatus,
+  onExpandFile,
   onViewedChange,
   fileAnnotationsMap,
   fileCommentsMap,
@@ -137,6 +143,19 @@ export const DiffViewer = memo(function DiffViewer({
               info={binaryInfo}
               viewed={viewedFiles.has(filePath)}
               onViewedChange={handleViewedChange}
+            />
+          )
+        }
+        const status = fileStatus.get(filePath)
+        if (status) {
+          return (
+            <HiddenFileDiff
+              key={`${filePath}-${index}-h`}
+              filePath={filePath}
+              status={status}
+              viewed={viewedFiles.has(filePath)}
+              onViewedChange={handleViewedChange}
+              onExpand={onExpandFile}
             />
           )
         }
