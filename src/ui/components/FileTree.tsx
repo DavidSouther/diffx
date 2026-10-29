@@ -17,10 +17,16 @@ import {
 } from 'lucide-react'
 import type { FileDiffMetadata } from '@pierre/diffs'
 
+export interface DiffStat {
+  additions: number
+  deletions: number
+}
+
 interface FileTreeProps {
   files: FileDiffMetadata[]
   activeFile: string | null
   commentCounts: Record<string, number>
+  diffStats: Record<string, DiffStat>
   viewedFiles: Set<string>
   untrackedFiles: Set<string>
   onFileClick: (filePath: string) => void
@@ -108,6 +114,7 @@ function TreeDir({
   node,
   activeFile,
   commentCounts,
+  diffStats,
   viewedFiles,
   untrackedFiles,
   onFileClick,
@@ -117,6 +124,7 @@ function TreeDir({
   node: TreeNode
   activeFile: string | null
   commentCounts: Record<string, number>
+  diffStats: Record<string, DiffStat>
   viewedFiles: Set<string>
   untrackedFiles: Set<string>
   onFileClick: (filePath: string) => void
@@ -152,6 +160,7 @@ function TreeDir({
                 node={child}
                 activeFile={activeFile}
                 commentCounts={commentCounts}
+                diffStats={diffStats}
                 viewedFiles={viewedFiles}
                 untrackedFiles={untrackedFiles}
                 onFileClick={onFileClick}
@@ -164,6 +173,7 @@ function TreeDir({
                 node={child}
                 activeFile={activeFile}
                 commentCount={commentCounts[child.file?.name ?? ''] ?? 0}
+                stat={diffStats[child.file?.name ?? '']}
                 viewed={viewedFiles.has(child.file?.name ?? '')}
                 untrackedFiles={untrackedFiles}
                 onFileClick={onFileClick}
@@ -181,6 +191,7 @@ function TreeFile({
   node,
   activeFile,
   commentCount,
+  stat,
   viewed,
   untrackedFiles,
   onFileClick,
@@ -189,6 +200,7 @@ function TreeFile({
   node: TreeNode
   activeFile: string | null
   commentCount: number
+  stat?: DiffStat
   viewed: boolean
   untrackedFiles: Set<string>
   onFileClick: (filePath: string) => void
@@ -207,10 +219,16 @@ function TreeFile({
       >
         {getFileIcon(node.file, viewed, untrackedFiles)}
         <span className="ft-file-name">{node.name}</span>
-        {commentCount > 0 && (
-          <span className="ft-comment-count">
-            <MessageSquare size={14} />
-            {commentCount}
+        {(commentCount > 0 || (stat && (stat.additions > 0 || stat.deletions > 0))) && (
+          <span className="ft-file-meta">
+            {commentCount > 0 && (
+              <span className="ft-comment-count">
+                <MessageSquare size={14} />
+                {commentCount}
+              </span>
+            )}
+            {stat && stat.additions > 0 && <span className="stat-additions">+{stat.additions}</span>}
+            {stat && stat.deletions > 0 && <span className="stat-deletions">-{stat.deletions}</span>}
           </span>
         )}
       </div>
@@ -218,7 +236,7 @@ function TreeFile({
   )
 }
 
-export function FileTree({ files, activeFile, commentCounts, viewedFiles, untrackedFiles, onFileClick, collapsed, onToggleCollapse }: FileTreeProps) {
+export function FileTree({ files, activeFile, commentCounts, diffStats, viewedFiles, untrackedFiles, onFileClick, collapsed, onToggleCollapse }: FileTreeProps) {
   const [filter, setFilter] = useState('')
 
   const filteredFiles = useMemo(() => {
@@ -280,6 +298,7 @@ export function FileTree({ files, activeFile, commentCounts, viewedFiles, untrac
               node={node}
               activeFile={activeFile}
               commentCounts={commentCounts}
+              diffStats={diffStats}
               viewedFiles={viewedFiles}
               untrackedFiles={untrackedFiles}
               onFileClick={onFileClick}
@@ -292,6 +311,7 @@ export function FileTree({ files, activeFile, commentCounts, viewedFiles, untrac
               node={node}
               activeFile={activeFile}
               commentCount={commentCounts[node.file?.name ?? ''] ?? 0}
+              stat={diffStats[node.file?.name ?? '']}
               viewed={viewedFiles.has(node.file?.name ?? '')}
               untrackedFiles={untrackedFiles}
               onFileClick={onFileClick}

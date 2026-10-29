@@ -152,7 +152,7 @@ export const FileDiffCard = memo(function FileDiffCard({
               theme: { dark: 'github-dark', light: 'github-light' },
               themeType: 'system',
               overflow: softWrap ? 'wrap' : 'scroll',
-              unsafeCSS: `:host { --diffs-tab-size: ${tabSize}; }`,
+              unsafeCSS: `:host { --diffs-tab-size: ${tabSize}; } [data-additions-count] { order: -2; } [data-deletions-count] { order: -1; }`,
             }}
             lineAnnotations={allAnnotations}
             selectedLines={selection}

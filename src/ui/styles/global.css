@@ -1007,12 +1007,25 @@ body {
     white-space: nowrap;
 }
 
-/* Comment count */
+/* Per-file chips: comment count and diff size */
+.ft-file-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+.ft-file-meta .stat-additions,
+.ft-file-meta .stat-deletions {
+    font-weight: 500;
+}
+
 .ft-comment-count {
     display: flex;
     align-items: center;
     gap: 3px;
-    margin-left: auto;
     color: var(--text-secondary);
     font-size: 12px;
     flex-shrink: 0;
