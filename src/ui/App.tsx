@@ -15,7 +15,7 @@ import { EMPTY_CHARACTER_COUNTS, entryStub } from './patchIndex'
 import { Toolbar } from './components/Toolbar'
 import { DiffViewer } from './components/DiffViewer'
 import type { FileStatus } from './components/HiddenFileDiff'
-import { FileTree } from './components/FileTree'
+import { FileTree, type DiffStat } from './components/FileTree'
 import { CommentTracker } from './components/CommentTracker'
 import { SidebarStorage } from './sidebarStorage'
 
@@ -151,6 +151,16 @@ export function App() {
     return { additions, deletions }
   }, [entries])
 
+  const fileDiffStats = useMemo(() => {
+    const stats: Record<string, DiffStat> = {}
+    for (const e of entries) {
+      const stat = (stats[e.name] ??= { additions: 0, deletions: 0 })
+      stat.additions += e.additions
+      stat.deletions += e.deletions
+    }
+    return stats
+  }, [entries])
+
   const commentCounts = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const c of comments) {
@@ -206,6 +216,7 @@ export function App() {
         files={files}
         activeFile={activeFile}
         commentCounts={commentCounts}
+        diffStats={fileDiffStats}
         viewedFiles={viewedFiles}
         untrackedFiles={untrackedSet}
         onFileClick={handleFileClick}
